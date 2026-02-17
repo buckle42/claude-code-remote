@@ -54,7 +54,7 @@ This prints your Mac's Tailscale IP (like `100.x.y.z`). Save this — you'll nee
 ### 3. Clone this repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/claude-code-remote.git
+git clone https://github.com/buckle42/claude-code-remote.git
 cd claude-code-remote
 ```
 
