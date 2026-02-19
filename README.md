@@ -131,6 +131,32 @@ To unload later:
 launchctl unload ~/Library/LaunchAgents/com.user.remote-cli.plist
 ```
 
+## Menu Bar App
+
+A macOS menu bar app gives you one-click control over the remote CLI services.
+
+### Install
+
+```bash
+pip3 install rumps
+```
+
+### Launch
+
+```bash
+python3 scripts/menubar.py
+```
+
+A "CC" icon appears in your menu bar with:
+
+- **Status indicator** — green (all healthy), gray (stopped), red (degraded)
+- **Open Voice UI / Open Terminal** — one-click to open in browser
+- **Start / Stop Services** — toggles the shell scripts
+- **View Logs** — opens ttyd or voice-wrapper logs in Console.app
+- **Auto-start on Login** — installs a launchd agent so the menu bar app launches at login
+
+The app polls service health every 5 seconds and updates the icon automatically.
+
 ## Usage Tips
 
 | Action | How |
