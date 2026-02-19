@@ -200,13 +200,15 @@ class RemoteCLIApp(rumps.App):
 
     @rumps.clicked("Open Voice UI")
     def open_voice_ui(self, _):
-        if self.tailscale_ip:
-            subprocess.run(["open", f"http://{self.tailscale_ip}:8080"])
+        host = self.tailscale_dns or self.tailscale_ip
+        if host:
+            subprocess.run(["open", f"http://{host}:8080"])
 
     @rumps.clicked("Open Terminal")
     def open_terminal(self, _):
-        if self.tailscale_ip:
-            subprocess.run(["open", f"http://{self.tailscale_ip}:7681"])
+        host = self.tailscale_dns or self.tailscale_ip
+        if host:
+            subprocess.run(["open", f"http://{host}:7681"])
 
     @rumps.clicked("Start Services")
     def toggle_services(self, _):
