@@ -18,6 +18,35 @@ DEFAULT_CONFIG = {
     "auto_start_services": False,
 }
 
+MENUBAR_PLIST_LABEL = "com.user.claude-code-remote-menubar"
+MENUBAR_PLIST_PATH = os.path.expanduser(
+    f"~/Library/LaunchAgents/{MENUBAR_PLIST_LABEL}.plist"
+)
+
+MENUBAR_PLIST_TEMPLATE = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \
+"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{label}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{python}</string>
+        <string>{script}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>
+"""
+
 # Icon states
 ICON_GREEN = "● CC"
 ICON_GRAY = "○ CC"
@@ -67,6 +96,8 @@ class RemoteCLIApp(rumps.App):
         self.config = self._load_config()
         if self.config["auto_start_services"]:
             self._start_services()
+
+        self.autostart_item.state = self._is_login_plist_installed()
 
     def _load_config(self):
         try:
@@ -189,8 +220,34 @@ class RemoteCLIApp(rumps.App):
             subprocess.run(["open", "-a", "Console", log_path])
 
     @rumps.clicked("Auto-start on Login")
-    def toggle_autostart(self, _):
-        pass  # Implemented in Task 6
+    def toggle_autostart(self, sender):
+        if sender.state:
+            self._uninstall_login_plist()
+            sender.state = False
+        else:
+            self._install_login_plist()
+            sender.state = True
+
+    def _is_login_plist_installed(self):
+        return os.path.exists(MENUBAR_PLIST_PATH)
+
+    def _install_login_plist(self):
+        import sys
+        plist_content = MENUBAR_PLIST_TEMPLATE.format(
+            label=MENUBAR_PLIST_LABEL,
+            python=sys.executable,
+            script=os.path.abspath(__file__),
+        )
+        os.makedirs(os.path.dirname(MENUBAR_PLIST_PATH), exist_ok=True)
+        with open(MENUBAR_PLIST_PATH, "w") as f:
+            f.write(plist_content)
+        subprocess.run(["launchctl", "load", MENUBAR_PLIST_PATH])
+
+    def _uninstall_login_plist(self):
+        subprocess.run(["launchctl", "unload", MENUBAR_PLIST_PATH],
+                        capture_output=True)
+        if os.path.exists(MENUBAR_PLIST_PATH):
+            os.remove(MENUBAR_PLIST_PATH)
 
     @rumps.clicked("Quit")
     def quit_app(self, _):
