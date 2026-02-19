@@ -265,11 +265,8 @@ class RemoteCLIApp(rumps.App):
         os.makedirs(os.path.dirname(MENUBAR_PLIST_PATH), exist_ok=True)
         with open(MENUBAR_PLIST_PATH, "w") as f:
             f.write(plist_content)
-        subprocess.run(["launchctl", "load", MENUBAR_PLIST_PATH])
 
     def _uninstall_login_plist(self):
-        subprocess.run(["launchctl", "unload", MENUBAR_PLIST_PATH],
-                        capture_output=True)
         if os.path.exists(MENUBAR_PLIST_PATH):
             os.remove(MENUBAR_PLIST_PATH)
 
