@@ -251,6 +251,15 @@ class RemoteCLIApp(rumps.App):
 
     @rumps.clicked("Quit")
     def quit_app(self, _):
+        if self.toggle_item.title == "Stop Services":
+            response = rumps.alert(
+                title="Quit Claude Code Remote",
+                message="Services are still running. Stop them before quitting?",
+                ok="Stop & Quit",
+                cancel="Quit (keep running)",
+            )
+            if response == 1:  # "Stop & Quit"
+                self._stop_services()
         rumps.quit_application()
 
 
