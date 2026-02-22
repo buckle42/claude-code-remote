@@ -74,3 +74,4 @@ This requires customizing the plist file:
 | `scripts/tmux-attach.sh` | Wrapper that clears env vars and attaches to (or creates) the tmux session. |
 | `scripts/voice-wrapper.py` | FastAPI app serving the mobile-optimized UI with dictation support. |
 | `scripts/remote-cli.plist` | launchd plist for auto-start on boot. Requires `YOUR_USERNAME` replacement. |
+| `scripts/menubar.py` | macOS menu bar app wrapping start/stop scripts. Provides status, URLs, logs, auto-start. Launch in background with `nohup python3 scripts/menubar.py &>/dev/null &`. |

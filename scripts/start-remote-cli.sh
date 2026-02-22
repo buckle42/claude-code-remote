@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure Homebrew paths are available (needed when launched from launchd/menubar)
+for p in /opt/homebrew/opt/python@3.11/libexec/bin /opt/homebrew/bin /usr/local/bin; do
+    [[ ":$PATH:" != *":$p:"* ]] && [ -d "$p" ] && PATH="$p:$PATH"
+done
+export PATH
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LOG_DIR="$PROJECT_DIR/logs"
