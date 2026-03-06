@@ -254,5 +254,23 @@ class TestDeadCode(unittest.TestCase):
         self.assertNotIn("auto_start_services", menubar.DEFAULT_CONFIG)
 
 
+class TestImportGuard(unittest.TestCase):
+    """Minor: missing rumps should give a helpful error, not raw traceback."""
+
+    def test_helpful_error_without_rumps(self):
+        import inspect
+        source = inspect.getsource(menubar)
+        self.assertIn("pip3 install rumps", source)
+
+
+class TestShutilWhich(unittest.TestCase):
+    """Minor: tailscale binary should use shutil.which with fallback."""
+
+    def test_get_tailscale_ip_uses_shutil_which(self):
+        import inspect
+        source = inspect.getsource(menubar.RemoteCLIApp._get_tailscale_ip)
+        self.assertIn("shutil.which", source)
+
+
 if __name__ == "__main__":
     unittest.main()

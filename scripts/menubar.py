@@ -4,9 +4,16 @@
 import json
 import os
 import plistlib
+import shutil
 import subprocess
 import sys
-import rumps
+
+try:
+    import rumps
+except ImportError:
+    print("Error: rumps is required for the menu bar app.")
+    print("Install it with: pip3 install rumps")
+    sys.exit(1)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
@@ -107,9 +114,10 @@ class RemoteCLIApp(rumps.App):
             json.dump(config, f, indent=2)
 
     def _get_tailscale_ip(self):
+        tailscale_bin = shutil.which("tailscale") or "tailscale"
         try:
             result = subprocess.run(
-                ["tailscale", "ip", "-4"],
+                [tailscale_bin, "ip", "-4"],
                 capture_output=True, text=True, timeout=5,
             )
             return result.stdout.strip() if result.returncode == 0 else None
@@ -117,9 +125,10 @@ class RemoteCLIApp(rumps.App):
             return None
 
     def _get_tailscale_dns(self):
+        tailscale_bin = shutil.which("tailscale") or "tailscale"
         try:
             result = subprocess.run(
-                ["tailscale", "status", "--json"],
+                [tailscale_bin, "status", "--json"],
                 capture_output=True, text=True, timeout=5,
             )
             if result.returncode == 0:
@@ -245,12 +254,18 @@ class RemoteCLIApp(rumps.App):
         log_path = os.path.join(LOG_DIR, "ttyd.log")
         if os.path.exists(log_path):
             subprocess.run(["open", "-a", "Console", log_path])
+        else:
+            rumps.notification("Claude Code Remote", "No logs yet",
+                               "ttyd.log will appear after services start.")
 
     @rumps.clicked("voice-wrapper.log")
     def view_voice_log(self, _):
         log_path = os.path.join(LOG_DIR, "voice-wrapper.log")
         if os.path.exists(log_path):
             subprocess.run(["open", "-a", "Console", log_path])
+        else:
+            rumps.notification("Claude Code Remote", "No logs yet",
+                               "voice-wrapper.log will appear after services start.")
 
     @rumps.clicked("Auto-start on Login")
     def toggle_autostart(self, sender):

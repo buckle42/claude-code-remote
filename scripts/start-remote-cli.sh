@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Ensure Homebrew paths are available (needed when launched from launchd/menubar)
-for p in /opt/homebrew/opt/python@3.11/libexec/bin /opt/homebrew/bin /usr/local/bin; do
+for p in /opt/homebrew/bin /usr/local/bin; do
     [[ ":$PATH:" != *":$p:"* ]] && [ -d "$p" ] && PATH="$p:$PATH"
 done
 export PATH
