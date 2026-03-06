@@ -2,6 +2,7 @@
 
 import json
 import os
+import plistlib
 import sys
 import tempfile
 import unittest
@@ -10,14 +11,69 @@ from unittest.mock import MagicMock, patch, PropertyMock
 # Add scripts dir to path so we can import menubar
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-# Mock rumps before importing menubar — rumps requires macOS AppKit
-sys.modules["rumps"] = MagicMock()
+# Mock rumps before importing menubar — rumps requires macOS AppKit.
+# We need a real App base class so RemoteCLIApp can be instantiated.
+_mock_rumps = MagicMock()
+
+
+class _FakeApp:
+    def __init__(self, title=None, quit_button=None):
+        self.title = title or ""
+
+
+_mock_rumps.App = _FakeApp
+# Make decorators pass through
+_mock_rumps.clicked = lambda name: lambda fn: fn
+_mock_rumps.timer = lambda interval: lambda fn: fn
+_mock_rumps.MenuItem = MagicMock
+sys.modules["rumps"] = _mock_rumps
 
 import menubar
 
 
-class TestMenubar(unittest.TestCase):
-    pass
+class TestPlistGeneration(unittest.TestCase):
+    """Critical #2: plist must use plistlib, not string formatting."""
+
+    def _make_app(self):
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        return app
+
+    def test_plist_escapes_special_characters(self):
+        """Paths with &, <, > must produce valid XML."""
+        app = self._make_app()
+        with tempfile.NamedTemporaryFile(suffix=".plist", delete=False) as f:
+            tmp_path = f.name
+        try:
+            with patch("menubar.MENUBAR_PLIST_PATH", tmp_path), \
+                 patch("menubar.os.path.abspath", return_value="/Users/test/A&B<C>/menubar.py"), \
+                 patch("menubar.os.makedirs"), \
+                 patch("menubar.sys.executable", "/usr/bin/python3", create=True):
+                app._install_login_plist()
+            with open(tmp_path, "rb") as f:
+                plist = plistlib.load(f)
+            self.assertEqual(plist["Label"], menubar.MENUBAR_PLIST_LABEL)
+            prog_args = plist["ProgramArguments"]
+            self.assertIn("/Users/test/A&B<C>/menubar.py", prog_args)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_plist_is_valid_xml(self):
+        """Generated plist must be parseable by plistlib."""
+        app = self._make_app()
+        with tempfile.NamedTemporaryFile(suffix=".plist", delete=False) as f:
+            tmp_path = f.name
+        try:
+            with patch("menubar.MENUBAR_PLIST_PATH", tmp_path), \
+                 patch("menubar.os.path.abspath", return_value="/normal/path/menubar.py"), \
+                 patch("menubar.os.makedirs"), \
+                 patch("menubar.sys.executable", "/usr/bin/python3", create=True):
+                app._install_login_plist()
+            with open(tmp_path, "rb") as f:
+                plist = plistlib.load(f)
+            self.assertTrue(plist["RunAtLoad"])
+            self.assertIn("/usr/bin", plist["EnvironmentVariables"]["PATH"])
+        finally:
+            os.unlink(tmp_path)
 
 
 if __name__ == "__main__":
