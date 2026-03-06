@@ -76,5 +76,44 @@ class TestPlistGeneration(unittest.TestCase):
             os.unlink(tmp_path)
 
 
+class TestTCCProtection(unittest.TestCase):
+    """Critical #1: warn when script is in a TCC-protected directory."""
+
+    def test_detects_tcc_protected_paths(self):
+        protected = [
+            os.path.expanduser("~/Documents/project/menubar.py"),
+            os.path.expanduser("~/Desktop/menubar.py"),
+            os.path.expanduser("~/Downloads/menubar.py"),
+        ]
+        for path in protected:
+            self.assertTrue(
+                menubar._is_tcc_protected_path(path),
+                f"Should detect {path} as TCC-protected",
+            )
+
+    def test_allows_safe_paths(self):
+        safe = [
+            os.path.expanduser("~/.local/bin/menubar.py"),
+            "/usr/local/bin/menubar.py",
+            os.path.expanduser("~/Developer/project/menubar.py"),
+        ]
+        for path in safe:
+            self.assertFalse(
+                menubar._is_tcc_protected_path(path),
+                f"Should allow {path}",
+            )
+
+    def test_install_plist_warns_on_tcc_path(self):
+        """Installing from a TCC path should show a rumps alert and not write plist."""
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        with patch("menubar._is_tcc_protected_path", return_value=True), \
+             patch("menubar.rumps") as mock_rumps, \
+             patch("menubar.plistlib.dump") as mock_dump:
+            mock_rumps.alert.return_value = 0
+            app._install_login_plist()
+            mock_rumps.alert.assert_called_once()
+            mock_dump.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -24,6 +24,20 @@ MENUBAR_PLIST_PATH = os.path.expanduser(
     f"~/Library/LaunchAgents/{MENUBAR_PLIST_LABEL}.plist"
 )
 
+# TCC-protected directories that launchd agents can't access without Full Disk Access
+_TCC_PROTECTED_DIRS = ("Documents", "Desktop", "Downloads", "Library/Mobile Documents")
+
+
+def _is_tcc_protected_path(path):
+    """Check if path is inside a macOS TCC-protected directory."""
+    home = os.path.expanduser("~")
+    try:
+        rel = os.path.relpath(path, home)
+    except ValueError:
+        return False
+    return any(rel.startswith(d) for d in _TCC_PROTECTED_DIRS)
+
+
 # Icon states
 ICON_GREEN = "● CC"
 ICON_GRAY = "○ CC"
@@ -236,11 +250,25 @@ class RemoteCLIApp(rumps.App):
         return os.path.exists(MENUBAR_PLIST_PATH)
 
     def _install_login_plist(self):
+        script_path = os.path.abspath(__file__)
+        if _is_tcc_protected_path(script_path):
+            rumps.alert(
+                title="Auto-start Warning",
+                message=(
+                    f"This script is inside a TCC-protected folder:\n"
+                    f"{os.path.dirname(script_path)}\n\n"
+                    "macOS will block launchd from accessing it after reboot. "
+                    "Move the project to ~/Developer or ~/.local/bin first, "
+                    "or grant Full Disk Access to the Terminal app."
+                ),
+                ok="Cancel",
+            )
+            return
         plist_data = {
             "Label": MENUBAR_PLIST_LABEL,
             "ProgramArguments": [
                 sys.executable,
-                os.path.abspath(__file__),
+                script_path,
             ],
             "RunAtLoad": True,
             "EnvironmentVariables": {
