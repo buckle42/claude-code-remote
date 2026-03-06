@@ -115,5 +115,41 @@ class TestTCCProtection(unittest.TestCase):
             mock_dump.assert_not_called()
 
 
+class TestProcessManagement(unittest.TestCase):
+    """Critical #3: Popen handles must be tracked and cleaned up."""
+
+    def test_start_stores_process_handle(self):
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        app._service_proc = None
+        app._services_running = False
+        mock_proc = MagicMock()
+        with patch("menubar.subprocess.Popen", return_value=mock_proc):
+            app._start_services()
+        self.assertIs(app._service_proc, mock_proc)
+
+    def test_stop_terminates_tracked_process(self):
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None  # still running
+        app._service_proc = mock_proc
+        app._services_running = True
+        with patch("menubar.subprocess.run"):
+            app._stop_services()
+        mock_proc.terminate.assert_called_once()
+        self.assertIsNone(app._service_proc)
+
+    def test_start_kills_existing_before_starting_new(self):
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        old_proc = MagicMock()
+        old_proc.poll.return_value = None  # still running
+        app._service_proc = old_proc
+        app._services_running = False
+        new_proc = MagicMock()
+        with patch("menubar.subprocess.Popen", return_value=new_proc):
+            app._start_services()
+        old_proc.terminate.assert_called_once()
+        self.assertIs(app._service_proc, new_proc)
+
+
 if __name__ == "__main__":
     unittest.main()

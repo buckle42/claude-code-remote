@@ -47,6 +47,8 @@ ICON_RED = "◉ CC"
 class RemoteCLIApp(rumps.App):
     def __init__(self):
         super().__init__(ICON_GRAY, quit_button=None)
+        self._service_proc = None
+        self._services_running = False
         self.tailscale_ip = self._get_tailscale_ip()
         self.tailscale_dns = self._get_tailscale_dns()
 
@@ -152,7 +154,8 @@ class RemoteCLIApp(rumps.App):
                 services[name] = True
 
         alive = sum(services.values())
-        if alive == 3 and self.tailscale_ip:
+        self._services_running = alive == 3 and self.tailscale_ip is not None
+        if self._services_running:
             self.title = ICON_GREEN
             self.status_item.title = "Status: Running (all services healthy)"
             self.toggle_item.title = "Stop Services"
@@ -161,6 +164,7 @@ class RemoteCLIApp(rumps.App):
             self.status_item.title = "Status: Stopped"
             self.toggle_item.title = "Start Services"
         else:
+            self._services_running = True  # partially running = treat as running for toggle
             self.title = ICON_RED
             down = [n for n, up in services.items() if not up]
             self.status_item.title = f"Status: Degraded ({', '.join(down)} down)"
@@ -204,20 +208,32 @@ class RemoteCLIApp(rumps.App):
 
     @rumps.clicked("Start Services")
     def toggle_services(self, _):
-        if self.toggle_item.title == "Start Services":
-            self._start_services()
-        else:
+        if self._services_running:
             self._stop_services()
+        else:
+            self._start_services()
 
     def _start_services(self):
+        if self._services_running and self._service_proc and self._service_proc.poll() is None:
+            return  # Already running — skip
+        # Kill existing tracked process to prevent zombies
+        if self._service_proc and self._service_proc.poll() is None:
+            self._service_proc.terminate()
+            self._service_proc.wait(timeout=10)
         start_script = os.path.join(SCRIPT_DIR, "start-remote-cli.sh")
-        subprocess.Popen(
+        self._service_proc = subprocess.Popen(
             [start_script],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            start_new_session=True,
         )
+        self._services_running = True
 
     def _stop_services(self):
+        if self._service_proc and self._service_proc.poll() is None:
+            self._service_proc.terminate()
+        self._service_proc = None
+        self._services_running = False
         stop_script = os.path.join(SCRIPT_DIR, "stop-remote-cli.sh")
         subprocess.run(
             [stop_script],
@@ -285,7 +301,7 @@ class RemoteCLIApp(rumps.App):
 
     @rumps.clicked("Quit")
     def quit_app(self, _):
-        if self.toggle_item.title == "Stop Services":
+        if self._services_running:
             response = rumps.alert(
                 title="Quit Claude Code Remote",
                 message="Services are still running. Stop them before quitting?",
