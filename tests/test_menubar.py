@@ -151,5 +151,73 @@ class TestProcessManagement(unittest.TestCase):
         self.assertIs(app._service_proc, new_proc)
 
 
+class TestServiceState(unittest.TestCase):
+    """Important #5 & #6: boolean flag and double-start guard."""
+
+    def test_toggle_uses_running_flag_not_title(self):
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        app._service_proc = None
+        app._services_running = False
+        app.toggle_item = MagicMock()
+        with patch.object(app, "_start_services") as start:
+            app.toggle_services(None)
+            start.assert_called_once()
+
+    def test_toggle_stops_when_running(self):
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        app._service_proc = None
+        app._services_running = True
+        app.toggle_item = MagicMock()
+        with patch.object(app, "_stop_services") as stop:
+            app.toggle_services(None)
+            stop.assert_called_once()
+
+    def test_start_is_noop_when_already_running(self):
+        """Double-start guard (Important #6)."""
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        app._services_running = True
+        app._service_proc = MagicMock()
+        app._service_proc.poll.return_value = None
+        with patch("menubar.subprocess.Popen") as popen:
+            app._start_services()
+            popen.assert_not_called()
+
+
+class TestPollingCadence(unittest.TestCase):
+    """Important #4: Tailscale info should poll less frequently than health."""
+
+    def test_tailscale_only_polls_every_12th_tick(self):
+        """5s * 12 = 60s cadence for Tailscale; every tick for PID checks."""
+        app = menubar.RemoteCLIApp.__new__(menubar.RemoteCLIApp)
+        app._poll_counter = 0
+        app.tailscale_ip = "100.1.2.3"
+        app.tailscale_dns = "mac.tail1234.ts.net"
+        app.ip_item = MagicMock()
+        app.dns_item = MagicMock()
+        app.status_item = MagicMock()
+        app.toggle_item = MagicMock()
+        app.title = ""
+        app.open_voice_item = MagicMock()
+        app.open_terminal_item = MagicMock()
+        app._services_running = False
+
+        with patch.object(app, "_get_tailscale_ip") as ts_ip, \
+             patch.object(app, "_get_tailscale_dns") as ts_dns, \
+             patch.object(app, "_read_pid", return_value=None), \
+             patch.object(app, "_is_process_alive", return_value=False):
+            # First call (counter=0) should poll Tailscale
+            app.health_check(None)
+            self.assertEqual(ts_ip.call_count, 1)
+
+            # Next 11 calls should NOT poll Tailscale
+            for _ in range(11):
+                app.health_check(None)
+            self.assertEqual(ts_ip.call_count, 1)
+
+            # 13th call (counter=12) should poll again
+            app.health_check(None)
+            self.assertEqual(ts_ip.call_count, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

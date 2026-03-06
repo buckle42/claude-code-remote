@@ -49,6 +49,7 @@ class RemoteCLIApp(rumps.App):
         super().__init__(ICON_GRAY, quit_button=None)
         self._service_proc = None
         self._services_running = False
+        self._poll_counter = 0
         self.tailscale_ip = self._get_tailscale_ip()
         self.tailscale_dns = self._get_tailscale_dns()
 
@@ -137,16 +138,20 @@ class RemoteCLIApp(rumps.App):
 
     @rumps.timer(5)
     def health_check(self, _):
-        """Poll PID files and process liveness every 5 seconds."""
-        self.tailscale_ip = self._get_tailscale_ip()
-        self.tailscale_dns = self._get_tailscale_dns()
-        self.ip_item.title = (
-            f"Tailscale IP: {self.tailscale_ip or 'Not connected'}"
-        )
-        self.dns_item.title = (
-            f"MagicDNS: {self.tailscale_dns or 'Not available'}"
-        )
+        """Poll PID files every 5s, Tailscale info every 60s."""
+        # Tailscale info changes rarely — poll every 60s (12 ticks)
+        if self._poll_counter % 12 == 0:
+            self.tailscale_ip = self._get_tailscale_ip()
+            self.tailscale_dns = self._get_tailscale_dns()
+            self.ip_item.title = (
+                f"Tailscale IP: {self.tailscale_ip or 'Not connected'}"
+            )
+            self.dns_item.title = (
+                f"MagicDNS: {self.tailscale_dns or 'Not available'}"
+            )
+        self._poll_counter += 1
 
+        # PID-based health checks every 5s (cheap file reads + signals)
         services = {"ttyd": False, "voice-wrapper": False, "caffeinate": False}
         for name in services:
             pid = self._read_pid(name)
